@@ -4,13 +4,12 @@ from flask_cors import CORS
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity, get_jwt
 from flask_ngrok import run_with_ngrok  # Import ngrok
 from pyngrok import ngrok
-import logging
 
 app = Flask(__name__)
 app.config["JWT_SECRET_KEY"] = "your_secret_key"  # Change this to a strong secret
 jwt = JWTManager(app)
 CORS(app)
-# logging.basicConfig(level=logging.DEBUG)
+
 
 # Expose the Flask app to the internet via ngrok
 # port = 5000
@@ -184,6 +183,8 @@ def add_entry():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+
+
 @app.route('/mark_exit', methods=['POST'])
 def mark_exit():
     data = request.json
@@ -232,12 +233,17 @@ def get_all_entries():
     
 @app.route('/entries_with_blank_out_time', methods=['GET'])
 def entries_with_blank_out_time():
-    app.logger.debug("GET request received")
-    entries = database.fetch_entries_with_blank_out_time()  # Fetch entries with blank out_time
-    if entries:
-        return jsonify(entries), 200
-    else:
-        return jsonify({"message": "No entries with blank out_time found"}), 404
+    print(f"Request received: {request.method} {request.path}")
+    try:
+        entries = database.fetch_entries_with_blank_out_time()
+        print(f"Fetched entries from database: {entries}")
+        if entries:
+            return jsonify(entries), 200
+        else:
+            return jsonify({"message": "No entries with blank out_time found"}), 404
+    except Exception as e:
+        print(f"Error fetching data: {str(e)}")
+        return jsonify({"error": "Failed to fetch entries", "message": str(e)}), 500
 
 # @app.route('/get_visitor_name', methods=['GET'])
 # def get_visitor_name():
@@ -391,6 +397,6 @@ def fetch_admins():
 if __name__ == "__main__":
     app.run(debug=True)
 
-# deploy
+
 # if __name__ == "__main__":
 #     app.run(port=port)

@@ -218,6 +218,10 @@ def print_pass(data):
     thermal_printer.text(f"In Time         : {data['in_time']}\n")
     thermal_printer.text(f"Vehicle Type    : {data['vehicle_type'].upper()}\n")
     thermal_printer.text(f"Remarks         : {data['remarks']}\n")
+    thermal_printer.text(f"DVR: {data['no_driver']}  "
+                          f"ST: {data['no_student']}  "
+                          f"VT: {data['no_visitor']}  "
+                          f"Total: {data['total']}\n")
     
     thermal_printer.text("--------------------------------\n")
     thermal_printer.set(bold=True, align='center', double_width=False)
@@ -249,6 +253,10 @@ def print_pass_from_html(html_data):
     in_time = soup.find("strong", text="In Time:").next_sibling.strip()
     vehicle_type = soup.find("strong", text="Vehicle Type:").next_sibling.strip()
     remarks = soup.find("strong", text="Remarks:").next_sibling.strip()
+    no_driver = soup.find("strong", text="Driver:").next_sibling.strip()
+    no_student = soup.find("strong", text="Student:").next_sibling.strip()
+    no_visitor = soup.find("strong", text="Visitor:").next_sibling.strip()
+    total = soup.find("strong", text="Total:").next_sibling.strip()
 
     # Stylish Printing Logic
     thermal_printer.set(bold=True, align='center', double_width=True, double_height=True)
@@ -263,6 +271,10 @@ def print_pass_from_html(html_data):
     thermal_printer.text(f"Vehicle No.     : {vehicle_no.upper()}\n")
     thermal_printer.text(f"Where To Go     : {destination.upper()}\n")
     thermal_printer.text(f"Reason          : {reason.upper()}\n")
+    thermal_printer.text(f"DVR: {no_driver}  "
+                          f"ST: {no_student}  "
+                          f"VT: {no_visitor}  "
+                          f"Total: {total}\n")
     thermal_printer.text(f"In Time         : {in_time}\n")
     thermal_printer.text(f"Vehicle Type    : {vehicle_type.upper()}\n")
     thermal_printer.text(f"Remarks         : {remarks}\n")

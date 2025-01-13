@@ -1,4 +1,4 @@
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 from typing import Optional
 from datetime import datetime
 
@@ -13,15 +13,27 @@ class GateEntry:
     vehicle_type: str  # e.g., "car", "bike", "none"
     vehicle_no: Optional[str] = None
     out_time: Optional[datetime] = None
+    no_driver: Optional[int] = 0
+    no_student: Optional[int] = 0
+    no_visitor: Optional[int] = 0
+    no_person: Optional[int] = field(init=False)
     remarks: Optional[str] = None
 
+    def __post_init__(self):
+        # Automatically calculate no_person after initialization
+        self.update_no_person()
+        
     def to_dict(self) -> dict:
         # Convert datetime to string for MongoDB compatibility
         gate_entry_dict = asdict(self)
-        gate_entry_dict["in_time"] = self.in_time.isoformat()
+        gate_entry_dict["in_time"] = self.in_time.strftime('%d-%m-%Y %a %H:%M:%S')
         if self.out_time:
-            gate_entry_dict["out_time"] = self.out_time.isoformat()
+            gate_entry_dict["out_time"] = self.out_time.strftime('%d-%m-%Y %a %H:%M:%S')
         return gate_entry_dict
+
+    def update_no_person(self):
+    # Automatically update the no_person based on no_driver, no_student, and no_visitor counts
+        self.no_person = int(self.no_driver) + int(self.no_student) + int(self.no_visitor)
 
 @dataclass
 class User:

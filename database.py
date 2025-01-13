@@ -8,7 +8,7 @@ from escpos.printer import Usb
 from bson import ObjectId  # Import ObjectId from bson
 from bson.regex import Regex
 import pytz
-from collection_format import Session, User
+from collection_format import Session, User, GateEntry
 
 # MongoDB connection setup
 MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://shiven:shiven424@cluster0.x0f38.mongodb.net/")
@@ -54,7 +54,7 @@ def start_session(username, ip_address):
     try:
         # Get current time in Asia/Kolkata timezone
         ist = pytz.timezone('Asia/Kolkata')
-        session_login_time = datetime.now(ist).strftime('%d-%m-%Y %a %I:%M:%S %p')  # Custom format as string
+        session_login_time = datetime.now(ist).strftime('%d-%m-%Y %a %H:%M:%S')  # Custom format as string
 
         # Create session data
         session_data = {
@@ -76,7 +76,7 @@ def end_session(username):
     try:
         # Use Asia/Kolkata timezone for consistency
         ist = pytz.timezone('Asia/Kolkata')
-        session_logout_time = datetime.now(ist).strftime('%d-%m-%Y %a %I:%M:%S %p')  # Custom format as string
+        session_logout_time = datetime.now(ist).strftime('%d-%m-%Y %a %H:%M:%S')  # Custom format as string
 
         # Update the session with the logout time
         result = sessions.update_one(
@@ -97,30 +97,30 @@ def generate_entry_id():
 
 def create_gate_entry(data):
     # Generate the base entry data
+    entry_id = generate_entry_id()
     ist = pytz.timezone('Asia/Kolkata')
-    in_time_ist = datetime.now(ist).strftime('%d-%m-%Y %a %I:%M:%S %p')
+    in_time_ist = datetime.now(ist)
     # print(in_time_ist)
-    entry_data = {
-        "entry_id": generate_entry_id(),
-        "name": data["name"],
-        "contact_no": data["contact_no"],
-        "destination": data["destination"],
-        "reason": data["reason"],
-        "in_time": in_time_ist,
-        "out_time": None,
-        "remarks": data["remarks"]
-    }
+    gate_entry = GateEntry(
+        entry_id=entry_id,
+        name=data["name"],
+        contact_no=data["contact_no"],
+        destination=data["destination"],
+        reason=data["reason"],
+        in_time=in_time_ist,
+        vehicle_type=data.get("vehicle_type", "none"),
+        vehicle_no=data.get("vehicle_no", None),
+        out_time=None,
+        no_driver=data.get("no_driver", 0),
+        no_student=data.get("no_student", 0),
+        no_visitor=data.get("no_visitor", 0),
+        remarks=data.get("remarks", None)
+    )
 
-    # Add vehicle_no if provided
-    if "vehicle_no" in data and data["vehicle_no"]:
-        entry_data["vehicle_no"] = data["vehicle_no"]
-
-    # Add vehicle_type if provided
-    if "vehicle_type" in data and data["vehicle_type"]:
-        entry_data["vehicle_type"] = data["vehicle_type"]
-
-    gate_entries.insert_one(entry_data)
-    return entry_data["entry_id"]
+    gate_entry.update_no_person()    
+    entry_data = gate_entry.to_dict()    
+    gate_entries.insert_one(entry_data)    
+    return gate_entry.entry_id
 
 def mark_exit_by_id(entry_id, out_time):
     result = gate_entries.update_one(
