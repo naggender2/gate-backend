@@ -177,11 +177,18 @@ def mark_exit_by_qr_code(entry_id, out_time):
     )
     return result.matched_count > 0
 
-def fetch_all_entries():
-    # Fetch all entries and convert ObjectId to string
-    entries = list(gate_entries.find().sort("in_time", -1))  # Retrieves all entries in the gate_entries collection
+def fetch_all_entries(page, limit):
+    # Calculate the number of documents to skip for pagination
+    skip = (page - 1) * limit
+    
+    # Fetch paginated entries from the database and sort by "in_time" in descending order
+    entries_cursor = gate_entries.find().sort("in_time", -1).skip(skip).limit(limit)
+    total_entries = gate_entries.count_documents({})  # Get the total number of entries
+    
     # Convert ObjectId to string for each entry
-    return [object_id_to_str(entry) for entry in entries]
+    entries = [object_id_to_str(entry) for entry in entries_cursor]
+    
+    return entries, total_entries
 
 def fetch_entries_with_blank_out_time():
     # Fetch only those entries where 'out_time' is None (blank)
@@ -227,41 +234,84 @@ def get_visitor_details_by_mobile(contact_no):
 #     matching_entries = gate_entries.find(filter_criteria)
 #     return [object_id_to_str(entry) for entry in matching_entries]
 
-def search_visitor_by_contact(contact_no):
-    """Searches for visitors by contact number."""
-    query = {"contact_no": contact_no}
-    return _execute_query(query)
-
-def search_visitor_by_id(entry_id):
-    """Searches for a visitor by entry ID (ObjectId)."""
+def search_visitor_by_contact(contact_no, page, limit):
+    """Searches for visitors by contact number with pagination."""
     try:
-        query = {"entry_id": entry_id}
+        query = {"contact_no": {"$regex": contact_no, "$options": "i"}}  # Case-insensitive search
+        return _execute_query_with_pagination(query, page, limit)
     except Exception as e:
-        print(f"Invalid ID format: {e}")
-        return []
-    return _execute_query(query)
+        print(f"Error in search_visitor_by_contact: {e}")
+        return [], 0
 
-def search_visitor_by_name(name):
-    """Searches for visitors by name."""
-    query = {"name": name}
-    return _execute_query(query)
-
-def _execute_query(query):
-    """Executes a MongoDB query and formats the results for JSON compatibility."""
+def search_visitor_by_id(entry_id, page, limit):
+    """Searches for a visitor by entry ID (ObjectId) with pagination."""
     try:
-        results = list(gate_entries.find(query))
+        query = {"entry_id": {"$regex": entry_id, "$options": "i"}}  # Case-insensitive search for ID
+        return _execute_query_with_pagination(query, page, limit)
+    except Exception as e:
+        print(f"Error in search_visitor_by_id: {e}")
+        return [], 0
+
+def search_visitor_by_name(name, page, limit):
+    """Searches for visitors by name with pagination."""
+    try:
+        query = {"name": {"$regex": name, "$options": "i"}}  # Case-insensitive partial match
+        return _execute_query_with_pagination(query, page, limit)
+    except Exception as e:
+        print(f"Error in search_visitor_by_name: {e}")
+        return [], 0
+
+def search_visitor_by_date(date, page, limit):
+    """Searches for visitors by a specific date with pagination."""
+    try:
+        # Query to match the date in the "in_time" field
+        query = {"in_time": {"$regex": f"^{date}", "$options": "i"}}  # Case-insensitive match at the start of the string
+        return _execute_query_with_pagination(query, page, limit)
+    except Exception as e:
+        print(f"Error in search_visitor_by_date: {e}")
+        return [], 0
+    
+def _execute_query_with_pagination(query, page, limit):
+    """Executes a MongoDB query with pagination and formats the results for JSON compatibility."""
+    try:
+        # Calculate the number of documents to skip based on the page and limit
+        skip = (page - 1) * limit
+
+        # Fetch results with pagination
+        total_entries = gate_entries.count_documents(query)  # Total number of matching documents
+        results = list(
+            gate_entries.find(query)
+            .sort("in_time", -1)
+            .skip(skip)
+            .limit(limit)
+        )
+
+        # Format results for JSON compatibility
+        formatted_results = []
         for result in results:
-            result["entry_id"] = result["entry_id"]
-            del result["_id"]
-        return results
+            formatted_result = {
+                "entry_id": result.get("entry_id", "N/A"),
+                "name": result.get("name", "N/A"),
+                "contact_no": result.get("contact_no", "N/A"),
+                "vehicle_no": result.get("vehicle_no", "N/A"),
+                "destination": result.get("destination", "N/A"),
+                "reason": result.get("reason", "N/A"),
+                "in_time": result.get("in_time", "N/A"),
+                "vehicle_type": result.get("vehicle_type", "N/A"),
+                "remarks": result.get("remarks", "N/A"),
+                "out_time": result.get("out_time", "N/A"),
+            }
+            formatted_results.append(formatted_result)
+
+        return formatted_results, total_entries
     except Exception as e:
-        print(f"Error executing query: {e}")
-        return []
+        print(f"Error executing query with pagination: {e}")
+        return [], 0
 
 def search_inside_visitor_by_contact(contact_no):
     """Searches for visitors by contact number who are currently inside."""
     query = {"contact_no": contact_no, "out_time": None}
-    return _execute_query(query)
+    return _inside_execute_query(query)
 
 def search_inside_visitor_by_id(entry_id):
     """Searches for a visitor by entry ID (ObjectId) who is currently inside."""
@@ -270,7 +320,7 @@ def search_inside_visitor_by_id(entry_id):
     except Exception as e:
         print(f"Invalid ID format: {e}")
         return []
-    return _execute_query(query)
+    return _inside_execute_query(query)
 
 def search_inside_visitor_by_name(name):
     """Searches for visitors by name who are currently inside."""

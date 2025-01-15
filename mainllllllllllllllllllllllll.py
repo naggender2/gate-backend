@@ -11,7 +11,7 @@ jwt = JWTManager(app)
 CORS(app)
 
 
-# Expose the Flask app to the internet via ngrok
+# # Expose the Flask app to the internet via ngrok
 # port = 5000
 # public_url = ngrok.connect(port)
 # print(f"Ngrok Tunnel URL: {public_url}")
@@ -183,6 +183,8 @@ def add_entry():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+
+
 @app.route('/mark_exit', methods=['POST'])
 def mark_exit():
     data = request.json
@@ -224,23 +226,24 @@ def handle_cancel():
 @app.route('/all_entries', methods=['GET'])
 def get_all_entries():
     try:
-        page = int(request.args.get('page', 1))  # Default to page 1 if not provided
-        limit = int(request.args.get('limit', 20))  # Default to 20 entries per page if not provided
-
-        entries, total_entries = database.fetch_all_entries(page, limit)
-
-        return jsonify({"visitors": entries, "totalEntries": total_entries}), 200
+        entries = database.fetch_all_entries()  # Fetch all entries from the database
+        return jsonify(entries), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     
 @app.route('/entries_with_blank_out_time', methods=['GET'])
 def entries_with_blank_out_time():
-    app.logger.debug("GET request received")
-    entries = database.fetch_entries_with_blank_out_time()  # Fetch entries with blank out_time
-    if entries:
-        return jsonify(entries), 200
-    else:
-        return jsonify({"message": "No entries with blank out_time found"}), 404
+    print(f"Request received: {request.method} {request.path}")
+    try:
+        entries = database.fetch_entries_with_blank_out_time()
+        print(f"Fetched entries from database: {entries}")
+        if entries:
+            return jsonify(entries), 200
+        else:
+            return jsonify({"message": "No entries with blank out_time found"}), 404
+    except Exception as e:
+        print(f"Error fetching data: {str(e)}")
+        return jsonify({"error": "Failed to fetch entries", "message": str(e)}), 500
 
 # @app.route('/get_visitor_name', methods=['GET'])
 # def get_visitor_name():
@@ -290,52 +293,23 @@ def get_visitor_details():
 
 @app.route('/search_entries', methods=['GET'])
 def search_visitor_endpoint():
-    # Get search type, query, page, and limit from request arguments
     search_type = request.args.get('search_type')
     query = request.args.get('query')
-    page = request.args.get('page', default=1, type=int)  # Default to page 1
-    limit = request.args.get('limit', default=20, type=int)  # Default to 20 entries per page
-
-    # Validate input
+    print(search_type, query)
     if not search_type or not query:
-        return jsonify({"error": "Both 'search_type' and 'query' are required parameters."}), 400
+        return jsonify({"error": "Both 'field' and 'value' are required parameters."}), 400
 
-    # Initialize results
-    results = []
-    total_entries = 0
-
-    # Select the appropriate search function based on the search_type
-    try:
-        if search_type == 'Contact':
-            results, total_entries = database.search_visitor_by_contact(query, page, limit)
-        elif search_type == 'ID':
-            results, total_entries = database.search_visitor_by_id(query, page, limit)
-        elif search_type == 'Name':
-            results, total_entries = database.search_visitor_by_name(query, page, limit)
-        elif search_type == 'Date':
-            formatted_date = query.replace("/", "-")
-            results, total_entries = database.search_visitor_by_date(formatted_date, page, limit)
-        else:
-            return jsonify({"error": "Invalid search_type provided. Use 'Contact', 'ID', or 'Name'."}), 400
-    except Exception as e:
-        return jsonify({"error": f"An error occurred while processing your request: {str(e)}"}), 500
-
-    # Return results with pagination details
-    if results:
-        return jsonify({
-            "visitors": results,
-            "totalEntries": total_entries,
-            "currentPage": page,
-            "entriesPerPage": limit
-        })
+    # Select the appropriate function based on the field
+    if search_type == 'Contact':
+        results = database.search_visitor_by_contact(query)
+    elif search_type == 'ID':
+        results = database.search_visitor_by_id(query)
+    elif search_type == 'Name':
+        results = database.search_visitor_by_name(query)
     else:
-        return jsonify({
-            "message": "No visitors found matching your criteria.",
-            "visitors": [],
-            "totalEntries": 0,
-            "currentPage": page,
-            "entriesPerPage": limit
-        })
+        return jsonify({"error": "Invalid search field provided."}), 400
+
+    return jsonify(results)
 
 @app.route('/search_inside_entries', methods=['GET'])
 def search_inside_visitor_endpoint():
@@ -423,6 +397,6 @@ def fetch_admins():
 if __name__ == "__main__":
     app.run(debug=True)
 
-# deploy
+# # deploy
 # if __name__ == "__main__":
 #     app.run(port=port)
