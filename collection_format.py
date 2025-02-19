@@ -52,6 +52,7 @@ class Session:
     session_login_time: datetime
     session_logout_time: Optional[datetime]
     ip_address: str
+    session_id: str
     def to_dict(self) -> dict:
         # Convert datetime to string for MongoDB compatibility
         session_dict = asdict(self)

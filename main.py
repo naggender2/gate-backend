@@ -4,6 +4,7 @@ from flask_cors import CORS
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity, get_jwt
 from flask_ngrok import run_with_ngrok  # Import ngrok
 from pyngrok import ngrok
+import uuid
 
 app = Flask(__name__)
 app.config["JWT_SECRET_KEY"] = "your_secret_key"  # Change this to a strong secret
@@ -77,8 +78,10 @@ def login():
     if not authenticated_user:
         return jsonify({"error": "Invalid username or password"}), 401
 
+    session_id = str(uuid.uuid4())
+
     # Start session
-    if not database.start_session(username, ip_address):
+    if not database.start_session(username, ip_address, session_id):
         return jsonify({"error": "Failed to create session"}), 500
     
     # Generate JWT token with a string identity (username) and additional claims
@@ -86,7 +89,7 @@ def login():
         identity=username,  # Use a string for the identity
         additional_claims={"role": authenticated_user["role"]}
     )
-    return jsonify({"access_token": access_token, "role": authenticated_user["role"]}), 200
+    return jsonify({"access_token": access_token, "role": authenticated_user["role"], "session_id": session_id}), 200
 
 
 @app.route('/logout', methods=['POST'])
@@ -96,6 +99,12 @@ def logout():
     username = get_jwt_identity()
     print("Logging out user:", username)
 
+    data = request.json
+    session_id = data.get("session_id")
+    print(session_id)
+    if not session_id:
+        return jsonify({"error": "Missing session_id"}), 400
+    
     # Get additional claims if needed (e.g., role)
     claims = get_jwt()
     role = claims.get("role", "unknown")
@@ -105,7 +114,7 @@ def logout():
         return jsonify({"error": "Invalid or missing token"}), 422
 
     # End session
-    if not database.end_session(username):
+    if not database.end_session(username, session_id):
         return jsonify({"error": "Failed to end session"}), 500
 
     return jsonify({"message": f"User '{username}' has logged out successfully."}), 200
@@ -313,8 +322,7 @@ def search_visitor_endpoint():
         elif search_type == 'Name':
             results, total_entries = database.search_visitor_by_name(query, page, limit)
         elif search_type == 'Date':
-            formatted_date = query.replace("/", "-")
-            results, total_entries = database.search_visitor_by_date(formatted_date, page, limit)
+            results, total_entries = database.search_visitor_by_date(query, page, limit)
         else:
             return jsonify({"error": "Invalid search_type provided. Use 'Contact', 'ID', or 'Name'."}), 400
     except Exception as e:
@@ -352,6 +360,8 @@ def search_inside_visitor_endpoint():
         results = database.search_inside_visitor_by_id(query)
     elif search_type == 'Name':
         results = database.search_inside_visitor_by_name(query)
+    elif search_type == 'Date':
+        results = database.search_inside_visitor_by_date(query)
     else:
         return jsonify({"error": "Invalid search field provided."}), 400
 

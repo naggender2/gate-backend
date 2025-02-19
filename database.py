@@ -50,7 +50,7 @@ def authenticate_user(username, password):
         return {"username": user["username"], "role": user["role"]}
     return None
 
-def start_session(username, ip_address):
+def start_session(username, ip_address, session_id):
     try:
         # Get current time in Asia/Kolkata timezone
         ist = pytz.timezone('Asia/Kolkata')
@@ -63,6 +63,7 @@ def start_session(username, ip_address):
             "session_login_time": session_login_time,
             "session_logout_time": None,
             "ip_address": ip_address,
+            "session_id": session_id,
         }
 
         # Insert the session into the database
@@ -72,7 +73,7 @@ def start_session(username, ip_address):
         print(f"Error starting session for user '{username}': {e}")
         return False
 
-def end_session(username):
+def end_session(username, session_id):
     try:
         # Use Asia/Kolkata timezone for consistency
         ist = pytz.timezone('Asia/Kolkata')
@@ -80,7 +81,7 @@ def end_session(username):
 
         # Update the session with the logout time
         result = sessions.update_one(
-            {"username": username, "session_logout_time": None},  # Find active session
+            {"username": username, "session_id": session_id, "session_logout_time": None},  # Find active session
             {"$set": {"session_logout_time": session_logout_time}}  # Set logout time in custom format
         )
         return result.matched_count > 0
@@ -261,11 +262,12 @@ def search_visitor_by_name(name, page, limit):
         print(f"Error in search_visitor_by_name: {e}")
         return [], 0
 
-def search_visitor_by_date(date, page, limit):
+def search_visitor_by_date(date_string, page, limit):
     """Searches for visitors by a specific date with pagination."""
     try:
+        parsed_date = datetime.strptime(date_string, "%d/%m/%Y").strftime("%d-%m-%Y")
         # Query to match the date in the "in_time" field
-        query = {"in_time": {"$regex": f"^{date}", "$options": "i"}}  # Case-insensitive match at the start of the string
+        query = {"in_time": {"$regex": f"^{parsed_date}", "$options": "i"}}  # Case-insensitive match at the start of the string
         return _execute_query_with_pagination(query, page, limit)
     except Exception as e:
         print(f"Error in search_visitor_by_date: {e}")
@@ -327,6 +329,17 @@ def search_inside_visitor_by_name(name):
     query = {"name": name, "out_time": None}
     return _inside_execute_query(query)
 
+def search_inside_visitor_by_date(date_string):
+    """Searches for visitors by a specific date with pagination."""
+    try:
+        parsed_date = datetime.strptime(date_string, "%d/%m/%Y").strftime("%d-%m-%Y")
+        # Query to match the date in the "in_time" field
+        query = {"in_time": {"$regex": f"^{parsed_date}", "$options": "i"}, "out_time": None}  # Case-insensitive match at the start of the string
+        return _inside_execute_query(query)
+    except Exception as e:
+        print(f"Error in search_visitor_by_date: {e}")
+        return [], 0
+    
 def _inside_execute_query(query):
     """Executes a MongoDB query and formats the results for JSON compatibility."""
     try:
